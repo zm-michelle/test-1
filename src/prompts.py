@@ -110,7 +110,10 @@ rewrite_prompt = ChatPromptTemplate.from_messages([
             "  3. For bullet lists, produce a Python list of plain strings, "
             "one string per bullet, e.g. ['Led team of 5 engineers', 'Reduced latency by 30%'].\n"
             "  4. If a section is absent from the resume, set its list to [].\n"
-            "  5. Output raw Python only — no markdown fences, no backticks, no comments.\n\n"
+            "  5. Output raw Python only — no markdown fences, no backticks, no comments.\n"
+            "  6. In EXPERIENCE and PROJECTS tuples, the date field must ALWAYS be a short "
+            "date string like 'Jan 2023 – Present' or 'June 2023 – Aug 2023' or empty string ''. "
+            "NEVER put sentence text, bullet content, or descriptions into the date field.\n\n"
 
             "════════════ TEMPLATE ════════════\n"
             "from reportlab.lib.pagesizes import letter\n"
@@ -130,7 +133,10 @@ rewrite_prompt = ChatPromptTemplate.from_messages([
             "]\n"
             "\n"
             "PROJECTS = [\n"
-            "    ('<PROJECT_NAME>', '<DATE_RANGE>', ['<BULLET_1>']),\n"
+            "    ('<PROJECT_NAME>', '<DATE_OR_EMPTY_STRING>', ['<BULLET_1>', '<BULLET_2>']),\n"
+            "    # DATE_OR_EMPTY_STRING must be a short date like 'Jan 2023 - Present' or ''.\n"
+            "    # NEVER put sentence text or bullet content into the date field.\n"
+            "    # All descriptive content belongs in the bullets list only.\n"
             "]\n"
             "\n"
             "EDUCATION = [\n"
@@ -243,15 +249,16 @@ evaluator_prompt = ChatPromptTemplate.from_messages([
             "The structure is correct — only evaluate the DATA values.\n\n"
             "Check ALL of the following:\n"
             "  1. NAME is the candidate's real full name, not a placeholder like '<CANDIDATE_FULL_NAME>'.\n"
-            "  2. CONTACT contains real email, phone, and location — no angle brackets or 'INSERT' text.\n"
+            "  2. CONTACT contains real email, phone, and location — no angle brackets, "
+            "no 'INSERT' text, and no consecutive '•' separators with nothing between them.\n"
             "  3. EXPERIENCE, EDUCATION, and SKILLS are all populated — none are empty lists [].\n"
             "  4. No bullet string contains placeholder text like 'TBD', '[Company]', or 'Lorem ipsum'.\n"
-            "  5. The OUTPUT_PATH variable has not been changed from the value assigned at the top of the script.\n\n"
-            "  6. EXPERIENCE must contain ALL jobs from the resume — cross-check the count. "
-            "     If the plain-text has 2 jobs, EXPERIENCE must have 2 tuples."
-            "  7. SKILLS must include every tool and framework mentioned in the resume — "
-            "no library should be silently dropped."
-            "CONTACT must not contain consecutive • separators with nothing between them."
+            "  5. The OUTPUT_PATH variable has not been changed from the value assigned at the top of the script.\n"
+            "  6. In EXPERIENCE and PROJECTS tuples, the date field (second or third element) must be "
+            "a short date string like 'Jan 2023 – Present' or empty string '' — never a sentence, "
+            "never bullet content, never descriptive text.\n"
+            "  7. GPA must be copied exactly from the resume — do not append honours, "
+            "classifications, or anything not present in the original.\n\n"
             "Return verdict: true only if ALL criteria pass and you have zero suggestions. "
             "Return verdict: false with a short, specific list of what needs fixing otherwise."
         ),
@@ -261,3 +268,5 @@ evaluator_prompt = ChatPromptTemplate.from_messages([
         "Resume generation script:\n{resume_code}",
     ),
 ])
+
+ 
