@@ -1,60 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
  
 
-section_resume_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        (
-            "You are a resume reviewer's assistant. "
-            "Your job is to read a plain-text resume that you will receive inside <resume>...</resume> "
-            "and split it into its distinct sections. "
-            "Each section must be self-contained and long enough for a reviewer to understand it on its own, "
-            "but scoped to a single topic — for example, one project, one job, or one credential. "
-            "Valid section types include: header (name, contact info, GPA, school), summary, "
-            "skills, one work experience entry, one project, certifications, awards, etc. "
-            "Preserve every word of the original text exactly — do not rewrite, summarise, or omit anything. "
-            "If a section already has a heading, keep it. If it does not, assign a short descriptive name."
-        ),
-    ),
-    (
-        "human",
-        "Resume:\n\n<resume>\n{stringified_resume}\n</resume>",
-    ),
-])
-
-
-rewrite_section_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        (
-            "You are an expert resume writer who tailors resumes to specific job postings. "
-            "You will receive one section of a candidate's resume inside <section>...</section> "
-             "Never add tools, skills, or experiences not present in the original section — keyword injection is only allowed when substituting equivalent existing phrasing, not adding new claims."
-            "and a list of keywords and skills extracted from the target job inside <keywords_and_skills>...</keywords_and_skills>.\n\n"
-            "Rewrite the section so that it:\n"
-            "  • Highlights skills, tools, and experiences that overlap with <keywords_and_skills>.\n"
-            "  • Substitutes a candidate's phrasing with a keyword from <keywords_and_skills> ONLY when "
-            "the candidate's described experience is functionally equivalent — never invent, exaggerate, "
-            "or imply experience the candidate does not have.\n"
-            "  • Uses strong action verbs and quantifies achievements wherever the original text supports it.\n"
-            "  • Mirrors the language and terminology from the job description naturally.\n"
-            "  • Remains completely truthful — do not add credentials, tools, or responsibilities "
-            "that are not present in the original section.\n\n"
-            "Return only the rewritten section content — no preamble, no commentary, no labels."
-        ),
-    ),
-    (
-        "human",
-        (
-            "Keywords and skills from job description:\n"
-            "<keywords_and_skills>\n{keywords_and_skills}\n</keywords_and_skills>\n\n"
-            "Resume section to rewrite:\n"
-            "<section>\n{section}\n</section>"
-        ),
-    ),
-])
-
-
 extract_jd_keyword_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
@@ -77,6 +23,77 @@ extract_jd_keyword_prompt = ChatPromptTemplate.from_messages([
     ),
 ])
 
+section_resume_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        (
+            "You are a resume reviewer's assistant. "
+            "Your job is to read a plain-text resume that you will receive inside <resume>...</resume> "
+            "and split it into its distinct sections. "
+            "Each section must be self-contained and long enough for a reviewer to understand it on its own, "
+            "but scoped to a single topic — for example, one project, one job, or one credential. "
+            "Valid section types include: header (name, contact info, GPA, school), summary, "
+            "skills, certifications, awards, etc. "
+            "CRITICAL: each individual job must be its own separate section — never merge "
+            "two jobs into one section. Each project must also be its own separate section. "
+            "If the resume has 2 jobs, you must return 2 separate experience sections. "
+            "If it has 3 projects, return 3 separate project sections. "
+            "Count the jobs and projects in the resume and verify your output has the same count.\n"
+        ),
+    ),
+    (
+        "human",
+        "Resume:\n\n<resume>\n{stringified_resume}\n</resume>",
+    ),
+])
+
+
+rewrite_section_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        (
+            "You are an expert LinkedIn resume writer who tailors resumes to specific job postings. "
+            "You will receive one section of a candidate's resume inside <section>...</section> "
+            "and a list of keywords and skills extracted from the target job inside <keywords_and_skills>...</keywords_and_skills>.\n\n"
+
+            "STRICT RULES — follow all of these without exception:\n"
+            "  • You may ONLY rephrase what already exists in the original section. "
+            "Never swap, add, or imply a tool, technology, or platform that is not "
+            "explicitly named in the original. "
+            "For example: if the original says 'SQLite', do NOT change it to 'Redis' or 'PostgreSQL'. "
+            "If the original says 'sockets', do NOT change it to 'FastAPI'. "
+            "If a keyword from the job description is not already in the section, skip it entirely.\n"
+            "  • For skills sections: preserve EVERY item listed. Do not drop any language, "
+            "framework, or tool — if it appears in the original, it must appear in the rewrite. "
+            "You may add a keyword from <keywords_and_skills> to the skills section ONLY if it "
+            "is functionally identical to something already listed.\n"
+            "  • For header sections: always include the candidate's full name as the "
+            "very first line of the rewritten content — never drop it.\n"
+            "  • Use strong action verbs and quantify achievements wherever the original text supports it.\n"
+            "  • Remains completely truthful — do not add credentials, tools, or responsibilities "
+            "that are not present in the original section.\n"
+            "  • Expand each bullet point to be descriptive and impactful — aim for 1-2 full sentences "
+            "per bullet. Add context about the impact, scale, or outcome wherever the original supports it. "
+            "For example, instead of '- Built REST API' write "
+            "'- Engineered and deployed a RESTful API using FastAPI, enabling real-time data access "
+            "for internal stakeholders and reducing manual reporting time.' "
+            "Only expand using information implied or stated in the original — do not invent metrics "
+            "or outcomes that aren't there.\n\n"
+
+            "Return only the rewritten section content — no preamble, no commentary, no labels."
+        ),
+    ),
+    (
+        "human",
+        (
+            "Keywords and skills from job description:\n"
+            "<keywords_and_skills>\n{keywords_and_skills}\n</keywords_and_skills>\n\n"
+            "Resume section to rewrite:\n"
+            "<section>\n{section}\n</section>"
+        ),
+    ),
+])
+
 
 rewrite_prompt = ChatPromptTemplate.from_messages([
     (
@@ -85,6 +102,7 @@ rewrite_prompt = ChatPromptTemplate.from_messages([
             "You are a resume data extractor. "
             "You will receive a plain-text resume and must output a single Python script "
             "by filling in the TEMPLATE below.\n\n"
+
             "RULES:\n"
             "  1. Copy the template EXACTLY — do not rename variables, reorder blocks, "
             "add functions, add imports, or wrap anything in if __name__ == '__main__'.\n"
@@ -141,7 +159,7 @@ rewrite_prompt = ChatPromptTemplate.from_messages([
             "title_style   = S(fontName='Helvetica-Bold', fontSize=9.5, leading=12)\n"
             "right_style   = S(fontName='Helvetica', fontSize=9, leading=12, alignment=TA_RIGHT)\n"
             "date_style    = S(fontName='Helvetica-Oblique', fontSize=9, leading=11, alignment=TA_RIGHT)\n"
-            "bullet_style  = S(fontName='Helvetica', fontSize=9, leading=12, leftIndent=12, firstLineIndent=0, spaceBefore=1)\n"
+            "bullet_style  = S(fontName='Helvetica', fontSize=8.5, leading=11, leftIndent=12, firstLineIndent=0, spaceBefore=1)\n"
             "skill_style   = S(fontName='Helvetica', fontSize=9, leading=12)\n"
             "\n"
             "def section_header(title):\n"
@@ -229,6 +247,10 @@ evaluator_prompt = ChatPromptTemplate.from_messages([
             "  3. EXPERIENCE, EDUCATION, and SKILLS are all populated — none are empty lists [].\n"
             "  4. No bullet string contains placeholder text like 'TBD', '[Company]', or 'Lorem ipsum'.\n"
             "  5. The OUTPUT_PATH variable has not been changed from the value assigned at the top of the script.\n\n"
+            "  6. EXPERIENCE must contain ALL jobs from the resume — cross-check the count. "
+            "     If the plain-text has 2 jobs, EXPERIENCE must have 2 tuples."
+            "  7. SKILLS must include every tool and framework mentioned in the resume — "
+            "no library should be silently dropped."
             "CONTACT must not contain consecutive • separators with nothing between them."
             "Return verdict: true only if ALL criteria pass and you have zero suggestions. "
             "Return verdict: false with a short, specific list of what needs fixing otherwise."

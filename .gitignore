@@ -2,6 +2,6 @@ myenv/
 git
 .pytest_cache
 outputs
- 
+src/test_resume_output.pdf 
 *.key
 outputs 

@@ -41,6 +41,9 @@ async def section_resume(state: AgentState, config: RunnableConfig)  :
     res: ResumeSections = await chain.ainvoke({
         "stringified_resume": state.get("stringified_resume")
     })
+    print(f"[section_resume] found {len(res.sections)} sections:", flush=True)
+    for s in res.sections:
+        print(f"  - {s.name!r}: {s.content[:80]!r}", flush=True)
 
     return {'sections': res.sections }
 
@@ -68,6 +71,9 @@ async def rewrite_sections(state: AgentState, config: RunnableConfig ):
             for i, section in enumerate(state["sections"])
         ]
     results: list[ResumeSection] = await asyncio.gather(*tasks)
+    print(f"[rewrite_sections] {len(results)} sections rewritten:", flush=True)
+    for s in results:
+        print(f"  - {s.name!r}:\n{s.content}", flush=True)
     return {"rewritten_sections": results}
 
 async def extract_jd_keyword(state: AgentState, config: RunnableConfig ):
