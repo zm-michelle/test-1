@@ -7,7 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain.chat_models import init_chat_model
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
-
+import json
 load_dotenv()
 
 
@@ -15,7 +15,7 @@ class LLMConfiguration(BaseModel):
     """Configuration for the agent"""
 
     smart_llm: str = Field(
-        default="ollama:qwen2.5:3b-instruct",
+        default="ollama:qwen2.5:7b-instruct",
         description="model to use for rewriting"
     )
     fast_llm: str = Field(
@@ -70,15 +70,24 @@ class LLMConfiguration(BaseModel):
             return self.max_workers
         return -1
 
+    
+
     @classmethod
     def from_runnable_config(cls, config: Optional[RunnableConfig] = None) -> "LLMConfiguration":
         configurable = config.get("configurable", {}) if config else {}
-        values: dict[str, Any] = {
-            field: os.environ.get(field.upper(), configurable.get(field))
-            for field in cls.model_fields
-        }
-        return cls(**{k: v for k, v in values.items() if v is not None})
-
+        values: dict[str, Any] = {}
+        for field in cls.model_fields:
+            val = os.environ.get(field.upper(), configurable.get(field))
+            if val is None:
+                continue
+            # parse JSON strings for list fields
+            if isinstance(val, str) and val.startswith("["):
+                try:
+                    val = json.loads(val)
+                except json.JSONDecodeError:
+                    pass
+            values[field] = val
+        return cls(**values)
 
 class Settings(BaseSettings):
     model_config = ConfigDict(extra="ignore", env_file=".env")

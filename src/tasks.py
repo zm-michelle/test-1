@@ -100,13 +100,18 @@ def run_graph_task(self, job_id: str, initial_state: dict, configurable: dict) -
                     },
                     "ts": _now(),
                 })
+                final_state_delta = state_delta
 
         # Workflow finished — write final verdict
         # The last state delta from "evaluator" holds verdict
         _update_job(r, job_id, {
             "status": "done",
             "current_node": "done",
-            "verdict": str(initial_state.get("verdict", False)),
+            "verdict": str(final_state_delta.get("verdict", False)),
+            "resume_output_path": final_state_delta.get(
+                "resume_output_path",
+                initial_state.get("resume_output_path", ""),   # fallback: evaluator doesn't re-emit this field
+            ),
         })
         _publish(r, job_id, {"event": "done", "node": None, "ts": _now()})
 

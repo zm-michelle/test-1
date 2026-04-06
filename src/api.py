@@ -163,7 +163,7 @@ def _build_initial_state(job_id: str, resume_text: str, job_description: str) ->
     return {
         "stringified_resume": resume_text,
         "job_description": job_description,
-        "resume_output_path": f"{job_id}_resume.pdf",
+        "resume_output_path": f"/app/src/outputs/{job_id}_resume.pdf",
         "sections": [],
         "rewritten_sections": [],
         "keywords_and_skills": "",
@@ -197,7 +197,7 @@ async def _create_job(
     )
     await redis.expire(f"job:{job_id}", settings.session_ttl_seconds)
     run_graph_task.delay(job_id, initial_state, configurable)
-
+    
 
 async def _sse_stream(job: dict, job_id: str, redis: aioredis.Redis) -> AsyncIterator[str]:
     """
@@ -294,12 +294,19 @@ async def create_job(
     req: JobRequest,
     redis: aioredis.Redis = Depends(get_redis),
     session: dict = Depends(require_session),
+    session_id: str | None = Cookie(default=None),
 ):
     job_id = str(uuid.uuid4())
-    configurable: dict[str, Any] = {}  # extend with LLM overrides if needed
+    configurable: dict[str, Any] = {}
     initial_state = _build_initial_state(job_id, req.resume_text, req.job_description)
 
     await _create_job(job_id, initial_state, configurable, redis)
+
+    await redis.set(
+        f"session:{session_id}:latest_job",
+        job_id,
+        ex=settings.session_ttl_seconds,
+    )
 
     return JobCreatedResponse(
         job_id=job_id,

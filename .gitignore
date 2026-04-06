@@ -1,0 +1,7 @@
+myenv/
+git
+.pytest_cache
+outputs
+ 
+*.key
+outputs 

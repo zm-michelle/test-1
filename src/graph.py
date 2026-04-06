@@ -116,9 +116,17 @@ async def rewrite_full_resume(
 async def evaluator(state, config: RunnableConfig, ):
     code_errors = []
     suggestions = []
+    verdict = False 
+
+    code = state["resume_code"].strip()
+    if code.startswith("```"):
+        code = code.split("\n", 1)[1]  # remove first ```python line
+    if code.endswith("```"):
+        code = code.rsplit("```", 1)[0]  # remove trailing ```
+    code = code.strip()
 
     with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
-        f.write(state["resume_code"])
+        f.write(code)
         tmp_path = f.name
 
     def _run_script() -> subprocess.CompletedProcess:
@@ -134,14 +142,16 @@ async def evaluator(state, config: RunnableConfig, ):
         result = await asyncio.to_thread(_run_script)
         if result.returncode != 0:
             code_errors.append(result.stderr)
+            print(f"[evaluator] SCRIPT ERROR:\n{result.stderr}\n[evaluator] SCRIPT CODE:\n{state['resume_code'][:500]}", flush=True)
+        else:
+            print(f"[evaluator] script ran OK", flush=True)
     except subprocess.TimeoutExpired:
         code_errors.append("Script timed out after 30 seconds.")
     except Exception as exc:
         code_errors.append(f"Script execution error: {exc}")
     finally:
         os.unlink(tmp_path)
-
-    verdict = False
+ 
 
     if not code_errors:
         try:
@@ -153,8 +163,7 @@ async def evaluator(state, config: RunnableConfig, ):
                 )
         except Exception as e:
             code_errors.append(f"Could not read output PDF: {e}")
-
-        verdict = False
+ 
     if not code_errors:   
         cfg = LLMConfiguration.from_runnable_config(config)
         llm = cfg.get_smart_llm().with_structured_output(EvaluatorOutput)

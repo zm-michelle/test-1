@@ -1,37 +1,28 @@
 services:
 
-  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6375:6379"
+      - "${REDIS_PORT:-6375}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  # ── Ollama ──────────────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
-    # Port intentionally NOT exposed to host to avoid conflicts with a local
-    # Ollama install. api and worker reach it via internal Docker network.
-    # Uncomment if you want to query Ollama directly from your host:
-    # ports:
-    #   - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
-      # Use ollama list — always available in the image, unlike curl
       test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 10s
       retries: 10
       start_period: 30s
 
-  # ── Model pull (runs once then exits) ───────────────────────────────────────
   ollama-pull:
     image: ollama/ollama:latest
     restart: "no"
@@ -42,13 +33,12 @@ services:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: >
       sh -c "
-        ollama pull qwen2.5:3b-instruct &&
-        ollama pull llama3.2
+        ollama pull ${SMART_LLM_MODEL:-qwen2.5:7b-instruct} &&
+        ollama pull ${FAST_LLM_MODEL:-llama3.2}
       "
     volumes:
       - ollama_data:/root/.ollama
 
-  # ── FastAPI ─────────────────────────────────────────────────────────────────
   api:
     build: .
     command: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
@@ -57,29 +47,25 @@ services:
       - ./src:/app/src
       - resume_output:/app/src/outputs
     ports:
-      - "8001:8000"
+      - "${API_PORT:-8001}:8000"
     env_file: .env
-    environment:
-      REDIS_URL: redis://redis:6379/0
-      OLLAMA_ENDPOINTS: '["http://ollama:11434"]'
     depends_on:
       redis:
         condition: service_healthy
       ollama:
         condition: service_healthy
 
-  # ── Celery worker ────────────────────────────────────────────────────────────
   worker:
     build: .
-    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2
+    command: >
+      celery -A tasks.celery_app worker
+      --loglevel=${CELERY_LOG_LEVEL:-info}
+      --concurrency=${CELERY_CONCURRENCY:-2}
     restart: unless-stopped
     volumes:
       - ./src:/app/src
       - resume_output:/app/src/outputs
     env_file: .env
-    environment:
-      REDIS_URL: redis://redis:6379/0
-      OLLAMA_ENDPOINTS: '["http://ollama:11434"]'
     depends_on:
       redis:
         condition: service_healthy
